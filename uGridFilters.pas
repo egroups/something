@@ -49,8 +49,6 @@ type
     FFullMenu: IFullMenuService;
     FFullPanel: TPanel;
     FGlobalKeyUp: TKeyEvent;
-    FInfoLabel: Tlabel;
-    FInfoPanel: TJvSecretPanel;
     FSavedFilters: IDictionary<string,string>;
     procedure FullClick(Sender: TObject);
     procedure ClearDetail; virtual;
@@ -68,8 +66,6 @@ type
     property Fields: IDictionary<integer,string> read FFields write FFields;
     property FullButton: TPanel read FFullButton write FFullButton;
     property FullEdit: TEdit read FFullEdit write FFullEdit;
-    property InfoLabel: Tlabel read FInfoLabel write FInfoLabel;
-    property InfoPanel: TJvSecretPanel read FInfoPanel write FInfoPanel;
     property SavedFilters: IDictionary<string,string> read FSavedFilters write
         FSavedFilters;
   protected
@@ -102,20 +98,27 @@ type
   TJvDBUltimGridFilters = class(TBaseGridFilters)
   private
     FColLineWidth: Integer;
+    FFiltersVisible: Boolean;
     FFirstLeftOffset: Integer;
     FGrid: TJvDBUltimGrid;
+    FInfoLabel: Tlabel;
+    FInfoPanel: TJvSecretPanel;
     FLink: TJvDBGridLayoutChangeLink;
+    procedure ChangeLayout;
+    procedure ChangeSize;
     procedure ClearDetail; override;
     function ColsWidth: Integer;
     procedure DrawFilters;
     function GridWidth: integer;
-    procedure ReformatEdits;
     procedure SaveFilters; override;
     procedure SetGrid(const Value: TJvDBUltimGrid);
     procedure ShowFilters(const pVisible: Boolean);
     property ColLineWidth: Integer read FColLineWidth write FColLineWidth;
+    property FiltersVisible: Boolean read FFiltersVisible write FFiltersVisible;
     property FirstLeftOffset: Integer read FFirstLeftOffset write FFirstLeftOffset;
     property Grid: TJvDBUltimGrid read FGrid write SetGrid;
+    property InfoLabel: Tlabel read FInfoLabel write FInfoLabel;
+    property InfoPanel: TJvSecretPanel read FInfoPanel write FInfoPanel;
   protected
     procedure AdjustWidth;
     procedure DoDetailChange(Sender: TObject);
