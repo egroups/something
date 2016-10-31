@@ -56,7 +56,6 @@ type
     procedure DetailClick(Sender: TObject);
     procedure DoKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure EditsGlobalKeyUp(const Value: TKeyEvent);
-    procedure SaveFilters; virtual; abstract;
     procedure SetDetailButtonHint(const Value: string);
     procedure SetFullButtonHint(const Value: string);
     procedure SetGlobalKeyUp(const Value: TKeyEvent);
@@ -74,6 +73,7 @@ type
     procedure EditExit(Sender: TObject);
     procedure EditDetailEnter(Sender: TObject);
     function GetFieldName(const pEdit: TEdit): string; virtual; abstract;
+    procedure SaveFilters; virtual; abstract;
     property DetailPanel: TPanel read FDetailPanel write FDetailPanel;
     property FullPanel: TPanel read FFullPanel write FFullPanel;
   public
@@ -126,7 +126,6 @@ type
     procedure DoFullChange(Sender: TObject);
     procedure FilterRecordFull(DataSet: TDataSet; var Accept: Boolean);
     function GetFieldName(const pEdit: TEdit): string; override;
-    function GridFilled: Boolean;
     procedure ReindexEdits;
     procedure Resize; override;
     property Link: TJvDBGridLayoutChangeLink read FLink write FLink;
@@ -145,7 +144,7 @@ uses
   JvJVCLUtils,Vcl.DBGrids,Vcl.Grids,WinApi.Windows,SysUtils
   ,VCL.Forms,System.Generics.Collections,System.Types
   ,uLogging,Spring.Data.ObjectDataset,uInterfaces,Spring.Container
-  ,uMsg
+  ,CodeSiteLogging
   ;
 
 constructor TJvDBUltimGridFilters.Create(AOwner: TComponent; const pGrid:
@@ -161,15 +160,32 @@ begin
   FullEdit.OnChange:=DoFullChange;
   Name:=Format('%sFilters',[Grid.Name]);
   ColLineWidth:=Ord(dgColLines in Grid.Options) * TDrawGrid(Grid).GridLineWidth;
+  FInfoPanel:=TJvSecretPanel.Create(AOwner);
+  with FInfoPanel do
+  begin
+    Parent:=TWinControl(AOwner);
+    Align:=alClient;
+    Visible:=False;
+  end;
+  FInfoLabel:=TLabel.Create(FInfoPanel);
+  with FInfoLabel do
+  begin
+    Caption:='Nejsou data';
+    Parent:=TWinControl(AOwner);
+    Left:=6;
+    Top:=Trunc((FInfoPanel.Height / 2) - (Height / 2));
+  end;
 
   FirstLeftOffset:=0;
   if dgIndicator in Grid.Options then
   begin
-    FirstLeftOffset:=IndicatorWidth+2;
+    //FirstLeftOffset:=btnWidth-1;
+    //FirstLeftOffset:=IndicatorWidth+1;
+    FirstLeftOffset:=IndicatorWidth+1;
   end;
-  Width:=GridWidth; //Pocatecni sirka z gridu
-  Logger.DebugInfo('Create ShowFilters');
-  ShowFilters(GridFilled);
+  //AdjustWidth;
+  ShowFilters(False);
+  FiltersVisible:=False;
 end;
 
 destructor TJvDBUltimGridFilters.Destroy;
@@ -182,13 +198,26 @@ procedure TJvDBUltimGridFilters.AdjustWidth;
 var
   lWidth: integer;
 begin
-  if GridFilled then
-  begin
-    lWidth:=GridWidth;
-    Width:=GridWidth;
-    FFullPanel.Width:=Width;
-    FDetailPanel.Width:=Width;
-  end;
+  Width:=GridWidth;
+  CodeSite.Send('Width',Width);
+  FFullPanel.Width:=Width;
+  FDetailPanel.Width:=Width;
+  FInfoPanel.Width:=Width;
+  FFullEdit.Width:=Width;
+end;
+
+procedure TJvDBUltimGridFilters.ChangeLayout;
+begin
+  if not FiltersVisible then ShowFilters(True);
+  DrawFilters;
+  //ReindexEdits;
+end;
+
+procedure TJvDBUltimGridFilters.ChangeSize;
+begin
+  AdjustWidth;
+  //DrawFilters;
+  ResizeFilters;
 end;
 
 procedure TJvDBUltimGridFilters.ClearDetail;
@@ -217,18 +246,11 @@ begin
   Result:=0;
   for i := 0 to Grid.Columns.Count-1 do
   begin
-    if Grid.Columns[i].Visible then
-    begin
-      Result:=Result+Grid.Columns[i].Width;
-      if dgColLines in Grid.Options then
-        Result := Result + ColLineWidth;
-    end;
+    Result:=Result+Grid.Columns[i].Width;
   end;
-  (*
   if dgColLines in Grid.Options then
     //Result := Result + TDrawGrid(Grid).GridLineWidth*Grid.Columns.Count;
     Result := Result + ColLineWidth*Grid.Columns.Count;
-  *)
 end;
 
 procedure TJvDBUltimGridFilters.DoFullChange(Sender: TObject);
@@ -264,43 +286,20 @@ var
   lLeft: Integer;
   //lOffset: Integer;
   lVisible: integer;
-begin
-  //if not Grid.DataSource.DataSet.Active then Exit;
 
+
+begin
   //lVisible:=VisibledColumnsCount;
-  lVisible:=Grid.VisibleColCount;
-  if lVisible<>Edits.Count then
-  begin
-    //Grid.BeginUpdate;
-    {$IFDEF DEBUG}
-    Logger.Info('%s TJvDBUltimGridFilters.DrawFilters-lVisible:%d Edits:%d',[Name,lVisible,Edits.Count]);
-    {$ENDIF}
-    //SaveFilters;
-    (*
-    for I := Edits.Count-1 downto 0 do
-      Edits.Items[I].Free;
-    *)
+  //lVisible:=Grid.VisibleColCount;
+  //if lVisible<>Edits.Count then
+  //begin
+    CodeSite.Send('Prekresleni filtru');
     Edits.Clear;
     Fields.Clear;
-    lLeft:=0;
-    //lOffset:=0;
+    lLeft:=FirstLeftOffset+1;
 
-      if dgIndicator in Grid.Options then
-      begin
-        //lOffset:=IndicatorWidth+1;
-        FullButton.Visible:=True;
-        DetailButton.Visible:=True;
-      end
-      else
-      begin
-        FullButton.Visible:=False;
-        DetailButton.Visible:=False;
-      end;
-      //lLeft:=lLeft+lOffset+1;
-      //lLeft:=lLeft+FirstLeftOffset+1;
-      lLeft:=lLeft+FirstLeftOffset;
-      FullEdit.Left:=lLeft;
-      FullEdit.Width:=Width-FullEdit.Left;
+    FullEdit.Left:=lLeft;
+    FullEdit.Width:=Width-lLeft;
 
     for i := 0 to Grid.Columns.Count-1 do
     begin
@@ -310,22 +309,14 @@ begin
         lEdit.Parent:=DetailPanel;
         lEdit.Tag:=i;
         lEdit.Top:=0;
-        (*
         lEdit.Left:=lLeft;
-        lEdit.Width:=Grid.Columns[i].Width+(ColLineWidth*2);
+        lEdit.Width:=Grid.Columns[i].Width+ColLineWidth;
         lLeft:=lLeft+Grid.Columns[i].Width+ColLineWidth;
-        *)
-        (*
-        if dgColLines in Grid.Options then
-          lLeft := lLeft + TDrawGrid(Grid).GridLineWidth;
-        *)
         lEdit.OnChange:=DoDetailChange;
         {$IFDEF DEBUG}
         lEdit.Hint:=Format('%d-%s',[i,Grid.Columns[i].FieldName]);
         lEdit.ShowHint:=True;
         {$ENDIF}
-        //lEdit.BevelInner:=bvNone;
-        //lEdit.BevelOuter:=bvNone;
         lEdit.Ctl3D:=False;
         lEdit.OnEnter:=EditDetailEnter;
         lEdit.OnExit:=EditExit;
@@ -334,19 +325,11 @@ begin
         lEdit.Color:=clrPasiveEdit;
         Edits.Add(lEdit);
         Fields.Add(i,Grid.Columns[i].FieldName);
-        {$IFDEF DEBUG}
-        Logger.Info('%s TJvDBUltimGridFilters.DrawFilters-lVisible:%d Edits:%d',[Name,lVisible,Edits.Count]);
-        {$ENDIF}
       end;
     end;
-    ReformatEdits;
+    ReindexEdits;
     EditsGlobalKeyUp(GlobalKeyUp);
-  end
-  else
-  begin
-    //ReindexEdits;
-    ResizeFilters;
-  end;
+  //end;
 end;
 
 procedure TJvDBUltimGridFilters.FilterRecordDetail(DataSet: TDataSet; var
@@ -430,25 +413,6 @@ begin
   Result:=Grid.Columns[pEdit.Tag].FieldName
 end;
 
-function TJvDBUltimGridFilters.GridFilled: Boolean;
-begin
-  Result := False;
-  if Grid<>nil then
-    begin
-      if Grid.DataSource<>nil then
-      begin
-        if Grid.DataSource.DataSet<>nil then
-        begin
-          if Grid.DataSource.DataSet.Active then
-            if Grid.Visible then
-            begin
-              Result:=True;
-            end;
-        end;
-      end;
-    end;
-end;
-
 function TJvDBUltimGridFilters.GridWidth: integer;
 begin
   //Result:=ColsWidth + ColLineWidth*2;
@@ -471,60 +435,12 @@ begin
         if Grid.DataSource.DataSet.Active then
         begin
           case Kind of
-            lcLayoutChanged:
-            begin
-              {$IFDEF DEBUG}
-              Logger.Info('%s TJvDBUltimGridFilters.LayoutChanged-lcLayoutChanged-DrawFilters',[Name]);
-              {$ENDIF}
-              DrawFilters;
-              ReindexEdits;
-            end;
-            lcSizeChanged:
-            begin
-              {$IFDEF DEBUG}
-              Logger.Info('%s TJvDBUltimGridFilters.LayoutChanged-lcSizeChanged-DrawFilters',[Name]);
-              {$ENDIF}
-              DrawFilters;
-              //ResizeFilters;
-            end;
-            lcTopLeftChanged:
-            begin
-              (*
-              {$IFDEF DEBUG}
-              Logger.Info('%s TJvDBUltimGridFilters.LayoutChanged-lcTopLeftChanged-DrawFilters',[Name]);
-              {$ENDIF}
-              DrawFilters;
-              ReindexEdits;
-              *)
-            end;
+            lcLayoutChanged: ChangeLayout;
+            lcSizeChanged: ChangeSize;
+            //lcTopLeftChanged:
           end;
         end;
       end;
-    end;
-  end;
-end;
-
-procedure TJvDBUltimGridFilters.ReformatEdits;
-var
-  i: Integer;
-  j: Integer;
-  lEdit: TEdit;
-  lLeft: Integer;
-begin
-  lLeft:=0;
-  j:=0; //pomocny index pro edity.Pocet nemusi souhlasit s poctem vsech sloupcu
-  lLeft:=lLeft+FirstLeftOffset+1;
-  FullEdit.Left:=lLeft;
-  FullEdit.Width:=Width-lLeft;
-  for i := 0 to Grid.Columns.Count-1 do
-  begin
-    if Grid.Columns[i].Visible then
-    begin
-      lEdit:=Edits.Items[j];
-      lEdit.Left:=lLeft;
-      lEdit.Width:=Grid.Columns[i].Width+(ColLineWidth*2);
-      lLeft:=lLeft+Grid.Columns[i].Width+ColLineWidth;
-      j:=j+1;
     end;
   end;
 end;
@@ -566,19 +482,14 @@ begin
       begin
         if Grid.Datasource.DataSet.Active then
         begin
+          AdjustWidth;
           Left:=Grid.Left;
-          //Width:=Grid.Width;
-          {$IFDEF DEBUG}
-          lGridWidth:=GridWidth;
-          {$ENDIF}
-          Width:=GridWidth;
           Top:=Grid.Top-Height;
-          //Invalidate;
           FullPanel.Left:=0;
-          FullPanel.Width:=Width;
+          //FullPanel.Width:=Width;
           FullPanel.Top:=0;
           DetailPanel.Left:=0;
-          DetailPanel.Width:=Width;
+          //DetailPanel.Width:=Width;
           DetailPanel.Top:=EditHeight;
         end;
       end;
@@ -593,7 +504,6 @@ var
   lEdit: TEdit;
   lGridWidth: integer;
   lLeft: Integer;
-  //lOffset: Integer;
 begin
   if Grid<>nil then
   begin
@@ -603,43 +513,27 @@ begin
       begin
         if Grid.DataSource.DataSet.Active then
         begin
-          //ShowFilters(True);
-          {$IFDEF DEBUG}
-          lGridWidth:=GridWidth;
-          lColsVisible:=Grid.VisibleColCount;
-          {$ENDIF}
-          //if Width<>GridWidth then
-          //begin
-            Logger.DebugInfo('%s TJvDBUltimGridFilters.ResizeFilters Width:%d Grid.Width:%d',[Name,Width,Grid.Width]);
-            Width:=GridWidth;
-            (*TODO: extracted code
-            lLeft:=0;
-            j:=0; //pomocny index pro edity.Pocet nemusi souhlasit s poctem vsech sloupcu
-            lLeft:=lLeft+FirstLeftOffset+1;
-            FullEdit.Left:=lLeft;
-            FullEdit.Width:=Width-lLeft;
-            for i := 0 to Grid.Columns.Count-1 do
+          if not FiltersVisible then ShowFilters(True);
+          Logger.DebugInfo('%s TJvDBUltimGridFilters.ResizeFilters Width:%d Grid.Width:%d',[Name,Width,Grid.Width]);
+          AdjustWidth;
+          j:=0; //pomocny index pro edity.Pocet nemusi souhlasit s poctem vsech sloupcu
+          lLeft:=FirstLeftOffset+1;
+          FullEdit.Left:=lLeft;
+          FullEdit.Width:=Width-lLeft;
+          for i := 0 to Grid.Columns.Count-1 do
+          begin
+            if Grid.Columns[i].Visible then
             begin
-              if Grid.Columns[i].Visible then
-              begin
-                lEdit:=Edits.Items[j];
-                lEdit.Left:=lLeft;
-                lEdit.Width:=Grid.Columns[i].Width+ColLineWidth;
-                lLeft:=lLeft+Grid.Columns[i].Width+ColLineWidth;
-                j:=j+1;
-              end;
+              lEdit:=Edits.Items[j];
+              lEdit.Left:=lLeft;
+              lEdit.Width:=Grid.Columns[i].Width+ColLineWidth;
+              lLeft:=lLeft+Grid.Columns[i].Width+ColLineWidth;
+              j:=j+1;
             end;
-            *)
-            ReformatEdits;
-          //end;
+          end;
         end;
       end;
     end;
-  end
-  else
-  begin
-    Logger.DebugInfo('ResizeFilters ShowFilters(True)');
-    ShowFilters(False);
   end;
 end;
 
@@ -690,13 +584,31 @@ begin
 end;
 
 procedure TJvDBUltimGridFilters.ShowFilters(const pVisible: Boolean);
+var
+  lVisible: Boolean;
 begin
   //Schovame info a zobrazime filtry
-  InfoPanel.Visible:=not pVisible;
-  FullButton.Visible:=pVisible;
-  FullPanel.Visible:=pVisible;
-  DetailButton.Visible:=pVisible;
-  DetailPanel.Visible:=pVisible;
+  if FiltersVisible<>pVisible then
+  begin
+    lVisible:=pVisible;
+    CodeSite.Send('FiltersVisible',pVisible);
+    InfoPanel.Visible:=not lVisible;
+    FullButton.Visible:=lVisible;
+    FullPanel.Visible:=lVisible;
+    DetailButton.Visible:=lVisible;
+    DetailPanel.Visible:=lVisible;
+    if dgIndicator in Grid.Options then
+    begin
+      FullButton.Visible:=True;
+      DetailButton.Visible:=True;
+    end
+    else
+    begin
+      FullButton.Visible:=False;
+      DetailButton.Visible:=False;
+    end;
+    FiltersVisible:=pVisible;
+  end;
 end;
 
 constructor TBaseGridFilters.Create(AOwner: TComponent);
@@ -788,27 +700,6 @@ begin
     BevelOuter:=bvNone;
     OnClick:=DetailClick;
     Caption:='X';
-  end;
-
-  FInfoPanel:=TJvSecretPanel.Create(AOwner);
-  with FInfoPanel do
-  begin
-    Parent:=TWinControl(AOwner);
-    Align:=alClient;
-    Visible:=False;
-  end;
-  FInfoPanel.Left:=Left;
-  FInfoPanel.Top:=0;
-  FInfoPanel.Width:=Width;
-  FInfoPanel.Height:=Height;
-
-  FInfoLabel:=TLabel.Create(FInfoPanel);
-  with FInfoLabel do
-  begin
-    Caption:='Nejsou data';
-    Parent:=TWinControl(AOwner);
-    Left:=6;
-    Top:=Trunc((FInfoPanel.Height / 2) - (Height / 2));
   end;
 
   Edits:=TCollections.CreateList<TEdit>(True);
@@ -1000,3 +891,4 @@ end;
 
 
 end.
+
