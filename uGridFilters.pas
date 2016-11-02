@@ -144,7 +144,6 @@ uses
   JvJVCLUtils,Vcl.DBGrids,Vcl.Grids,WinApi.Windows,SysUtils
   ,VCL.Forms,System.Generics.Collections,System.Types
   ,uLogging,Spring.Data.ObjectDataset,uInterfaces,Spring.Container
-  ,CodeSiteLogging
   ;
 
 constructor TJvDBUltimGridFilters.Create(AOwner: TComponent; const pGrid:
@@ -179,11 +178,8 @@ begin
   FirstLeftOffset:=0;
   if dgIndicator in Grid.Options then
   begin
-    //FirstLeftOffset:=btnWidth-1;
-    //FirstLeftOffset:=IndicatorWidth+1;
     FirstLeftOffset:=IndicatorWidth+1;
   end;
-  //AdjustWidth;
   ShowFilters(False);
   FiltersVisible:=False;
 end;
@@ -199,7 +195,6 @@ var
   lWidth: integer;
 begin
   Width:=GridWidth;
-  CodeSite.Send('Width',Width);
   FFullPanel.Width:=Width;
   FDetailPanel.Width:=Width;
   FInfoPanel.Width:=Width;
@@ -210,13 +205,11 @@ procedure TJvDBUltimGridFilters.ChangeLayout;
 begin
   if not FiltersVisible then ShowFilters(True);
   DrawFilters;
-  //ReindexEdits;
 end;
 
 procedure TJvDBUltimGridFilters.ChangeSize;
 begin
   AdjustWidth;
-  //DrawFilters;
   ResizeFilters;
 end;
 
@@ -249,7 +242,6 @@ begin
     Result:=Result+Grid.Columns[i].Width;
   end;
   if dgColLines in Grid.Options then
-    //Result := Result + TDrawGrid(Grid).GridLineWidth*Grid.Columns.Count;
     Result := Result + ColLineWidth*Grid.Columns.Count;
 end;
 
@@ -259,7 +251,6 @@ begin
   if FilterMode<>fmFull then
   begin
     ClearDetail;
-    //Grid.Datasource.DataSet.Filtered:=False;
     Grid.Datasource.DataSet.OnFilterRecord:=FilterRecordFull;
     FilterMode:=fmFull;
   end;
@@ -272,7 +263,6 @@ begin
   if FilterMode<>fmDetail then
   begin
     ClearFull;
-    //Grid.Datasource.DataSet.Filtered:=False;
     Grid.Datasource.DataSet.OnFilterRecord:=FilterRecordDetail;
     FilterMode:=fmDetail;
   end;
@@ -284,52 +274,43 @@ var
   i: Integer;
   lEdit: TEdit;
   lLeft: Integer;
-  //lOffset: Integer;
   lVisible: integer;
-
-
 begin
-  //lVisible:=VisibledColumnsCount;
-  //lVisible:=Grid.VisibleColCount;
-  //if lVisible<>Edits.Count then
-  //begin
-    CodeSite.Send('Prekresleni filtru');
-    Edits.Clear;
-    Fields.Clear;
-    lLeft:=FirstLeftOffset+1;
+  Edits.Clear;
+  Fields.Clear;
+  lLeft:=FirstLeftOffset+1;
 
-    FullEdit.Left:=lLeft;
-    FullEdit.Width:=Width-lLeft;
+  FullEdit.Left:=lLeft;
+  FullEdit.Width:=Width-lLeft;
 
-    for i := 0 to Grid.Columns.Count-1 do
+  for i := 0 to Grid.Columns.Count-1 do
+  begin
+    if Grid.Columns[i].Visible then
     begin
-      if Grid.Columns[i].Visible then
-      begin
-        lEdit:=TEdit.Create(DetailPanel);
-        lEdit.Parent:=DetailPanel;
-        lEdit.Tag:=i;
-        lEdit.Top:=0;
-        lEdit.Left:=lLeft;
-        lEdit.Width:=Grid.Columns[i].Width+ColLineWidth;
-        lLeft:=lLeft+Grid.Columns[i].Width+ColLineWidth;
-        lEdit.OnChange:=DoDetailChange;
-        {$IFDEF DEBUG}
-        lEdit.Hint:=Format('%d-%s',[i,Grid.Columns[i].FieldName]);
-        lEdit.ShowHint:=True;
-        {$ENDIF}
-        lEdit.Ctl3D:=False;
-        lEdit.OnEnter:=EditDetailEnter;
-        lEdit.OnExit:=EditExit;
-        lEdit.TabOrder:=FullEdit.TabOrder+i+1;
-        lEdit.TabStop:=True;
-        lEdit.Color:=clrPasiveEdit;
-        Edits.Add(lEdit);
-        Fields.Add(i,Grid.Columns[i].FieldName);
-      end;
+      lEdit:=TEdit.Create(DetailPanel);
+      lEdit.Parent:=DetailPanel;
+      lEdit.Tag:=i;
+      lEdit.Top:=0;
+      lEdit.Left:=lLeft;
+      lEdit.Width:=Grid.Columns[i].Width+ColLineWidth;
+      lLeft:=lLeft+Grid.Columns[i].Width+ColLineWidth;
+      lEdit.OnChange:=DoDetailChange;
+      {$IFDEF DEBUG}
+      lEdit.Hint:=Format('%d-%s',[i,Grid.Columns[i].FieldName]);
+      lEdit.ShowHint:=True;
+      {$ENDIF}
+      lEdit.Ctl3D:=False;
+      lEdit.OnEnter:=EditDetailEnter;
+      lEdit.OnExit:=EditExit;
+      lEdit.TabOrder:=FullEdit.TabOrder+i+1;
+      lEdit.TabStop:=True;
+      lEdit.Color:=clrPasiveEdit;
+      Edits.Add(lEdit);
+      Fields.Add(i,Grid.Columns[i].FieldName);
     end;
-    ReindexEdits;
-    EditsGlobalKeyUp(GlobalKeyUp);
-  //end;
+  end;
+  ReindexEdits;
+  EditsGlobalKeyUp(GlobalKeyUp);
 end;
 
 procedure TJvDBUltimGridFilters.FilterRecordDetail(DataSet: TDataSet; var
@@ -415,10 +396,7 @@ end;
 
 function TJvDBUltimGridFilters.GridWidth: integer;
 begin
-  //Result:=ColsWidth + ColLineWidth*2;
-  //if dgIndicator in Grid.Options then Result:=Result+IndicatorWidth;
   Result:=Grid.Width-ColLineWidth*2;
-  //if dgIndicator in Grid.Options then Result:=Result-IndicatorWidth;
   if (GetWindowlong(Grid.Handle, GWL_STYLE) and WS_VSCROLL) <> 0 then
     Result:=Result-GetSystemMetrics(SM_CYVSCROLL);
 end;
@@ -437,7 +415,6 @@ begin
           case Kind of
             lcLayoutChanged: ChangeLayout;
             lcSizeChanged: ChangeSize;
-            //lcTopLeftChanged:
           end;
         end;
       end;
@@ -451,9 +428,6 @@ var
   lEdit: TEdit;
   lEditIndex: Integer;
 begin
-  {$IFDEF DEBUG}
-  Logger.Info('%s TJvDBUltimGridFilters.ReindexEdits Cols:%d',[Name,Grid.Columns.Count]);
-  {$ENDIF}
   //Mely by se precislovat tagy,protoze se mohli presunout sloupce
   Fields.Clear;
   lEditIndex:=0;
@@ -470,10 +444,7 @@ begin
 end;
 
 procedure TJvDBUltimGridFilters.Resize;
-var
-  lGridWidth: integer;
 begin
-  Logger.DebugInfo('%s TJvDBUltimGridFilters.Resize',[Name]);
   if Grid<>nil then
   begin
     if Grid.DataSource<>nil then
@@ -514,7 +485,6 @@ begin
         if Grid.DataSource.DataSet.Active then
         begin
           if not FiltersVisible then ShowFilters(True);
-          Logger.DebugInfo('%s TJvDBUltimGridFilters.ResizeFilters Width:%d Grid.Width:%d',[Name,Width,Grid.Width]);
           AdjustWidth;
           j:=0; //pomocny index pro edity.Pocet nemusi souhlasit s poctem vsech sloupcu
           lLeft:=FirstLeftOffset+1;
@@ -576,11 +546,9 @@ begin
     if FGrid <> nil then
     begin
       FGrid.RegisterLayoutChangeLink(FLink);
-      //DataSet:=FGrid.DataSource.DataSet;
     end;
     Name:=Format('%sFilters',[FGrid.Name]);
   end;
-  //Resize;
 end;
 
 procedure TJvDBUltimGridFilters.ShowFilters(const pVisible: Boolean);
@@ -591,7 +559,6 @@ begin
   if FiltersVisible<>pVisible then
   begin
     lVisible:=pVisible;
-    CodeSite.Send('FiltersVisible',pVisible);
     InfoPanel.Visible:=not lVisible;
     FullButton.Visible:=lVisible;
     FullPanel.Visible:=lVisible;
@@ -632,11 +599,9 @@ begin
   FullPanel:=TPanel.Create(Self);
   FullPanel.SetSubComponent(True);
   FullPanel.Parent:=Self;
-  //DetailPanel.Align:=alClient;
   FullPanel.Left:=Left;
   FullPanel.Top:=0;
   FullPanel.Width:=Width;
-  //FullPanel.Color:=clYellow;
   FullPanel.BevelInner:=bvNone;
   FullPanel.BevelOuter:=bvNone;
   FullPanel.TabOrder:=1;
@@ -659,11 +624,9 @@ begin
   DetailPanel:=TPanel.Create(Self);
   DetailPanel.SetSubComponent(True);
   DetailPanel.Parent:=Self;
-  //DetailPanel.Align:=alClient;
   DetailPanel.Left:=Left;
   DetailPanel.Top:=EditHeight;
   DetailPanel.Width:=Width;
-  //DetailPanel.Color:=clYellow;
   DetailPanel.BevelInner:=bvNone;
   DetailPanel.BevelOuter:=bvNone;
   DetailPanel.TabOrder:=2;
@@ -678,8 +641,6 @@ begin
     Height:=EditHeight;
     Width:=IndicatorWidth+1;
     Visible:=False;
-    //BorderWidth:=1;
-    //BorderStyle:=bsSingle;
     BevelInner:=bvRaised;
     BevelOuter:=bvNone;
     OnClick:=FullClick;
@@ -694,8 +655,6 @@ begin
     Height:=EditHeight;
     Width:=IndicatorWidth+1;
     Visible:=False;
-    //BorderWidth:=1;
-    //BorderStyle:=bsSingle;
     BevelInner:=bvRaised;
     BevelOuter:=bvNone;
     OnClick:=DetailClick;
@@ -706,7 +665,6 @@ begin
   Fields:=TCollections.CreateDictionary<integer,string>;
   SavedFilters:=TCollections.CreateDictionary<string,string>;
   FullMenu:=TFullMenuService.Create(self);
-  //OnKeyUp:=DoKeyUp;
 end;
 
 destructor TBaseGridFilters.Destroy;
@@ -776,10 +734,6 @@ end;
 
 procedure TBaseGridFilters.DoKeyUp(Sender: TObject; var Key: Word; Shift:
     TShiftState);
-(*
-var
-  lInt: Integer;
-*)
 begin
   case Key of
     VK_LEFT:
@@ -787,7 +741,6 @@ begin
       if FilterMode=fmDetail then
       begin
         Key:=0;
-        //lInt:=Edits.IndexOf(TEdit(Sender));
       end;
     end;
   end;
@@ -795,7 +748,6 @@ end;
 
 procedure TBaseGridFilters.EditDetailEnter(Sender: TObject);
 begin
-  //FilterMode:=fmDetail;
   TEdit(Sender).Color:=ColorActive;
 end;
 
@@ -842,17 +794,14 @@ begin
   case FilterMode of
     fmNone:
     begin
-      //FullEdit.SetFocus;
       FilterMode:=fmFull
     end;
     fmFull:
     begin
-      //Edits.First.SetFocus;
       FilterMode:=fmDetail
     end;
     fmDetail:
     begin
-      //FullEdit.SetFocus;
       FilterMode:=fmFull
     end;
   end;
@@ -888,7 +837,6 @@ procedure TFullMenuService.Show(const pX, pY: Integer);
 begin
   Menu.Popup(pX,pY);
 end;
-
 
 end.
 

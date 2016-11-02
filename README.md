@@ -12,5 +12,5 @@ I preffered czech language.
 * Too many layout change events from TJvDBUltimGrid.Need minimize this
 
 The sources depend on the following libraries and components:
-  * [Spring4d](http://bitbucket/org/sglienke/spring4d)
+  * [Spring4d](https://bitbucket.org/sglienke/spring4d)
   * [JEDI VCL](https://github.com/project-jedi/jvcl)
